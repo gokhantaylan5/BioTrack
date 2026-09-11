@@ -92,7 +92,7 @@ The wearable unit is built around an ESP32 microcontroller and includes the foll
 
 | Battery            | Portable power source                              |
 
-| Charging Circuit   | Battery charging                                   |
+| TPA4056            | Battery charging                                   |
 
 | 5V Boost Converter | Power regulation                                   |
 
