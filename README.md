@@ -1,426 +1,218 @@
-**BioTrack**
+# BioTrack
 
+### BLE-Based Wearable Health & Safety Monitoring System
 
+> [!IMPORTANT]
+> **Disclaimer:** BioTrack is an engineering and educational prototype. Its measurements and event-detection algorithms are not intended for medical diagnosis or to replace certified medical devices or professional medical assessment.
 
-BLE-Based Wearable Health \& Safety Monitoring System
+BioTrack is an **ESP32-based wearable monitoring prototype** that collects biometric and motion data, identifies potential safety events, and transmits sensor readings to an Android application via **Bluetooth Low Energy (BLE)**.
 
+The project combines heart-rate monitoring, motion analysis, fall and inactivity detection, manual emergency alerts, and real-time mobile visualization in a portable system.
 
+## Overview
 
-**Disclaimer**
+BioTrack was developed for scenarios where continuous observation and timely awareness of potential emergencies may be useful. The wearable monitors:
 
+- Heart rate (BPM) and infrared (IR) sensor readings
+- Three-axis acceleration and angular velocity
+- Activity level and inactivity status
+- Potential fall events
+- Manual emergency-button activation
 
+An ESP32 processes the sensor data and communicates with a Flutter-based Android application over BLE. The prototype's mobile interface supports live data visualization, configurable thresholds, and audible or notification-based alerts.
 
-BioTrack is an engineering and educational prototype. The measurements and detection algorithms are not intended to replace certified medical devices or professional medical assessment.
-
-
-
-
-
-BioTrack is an ESP32-based wearable monitoring system designed to continuously collect biometric and motion data, analyze potential safety events, and transmit the collected information to a mobile application over **Bluetooth Low Energy (BLE)**.
-
-
-
-The system combines heart-rate monitoring, motion analysis, emergency detection, and real-time mobile visualization in a compact wearable platform.
-
-
-
-**Overview**
-
-
-
-BioTrack is designed for scenarios where continuous monitoring and rapid awareness of potential emergencies are important.
-
-
-
-The system collects:
-
-
-
-* Heart rate data
-* Infrared (IR) sensor data
-* Accelerometer data
-* Gyroscope data
-* Activity information
-* Fall detection status
-* Inactivity status
-
-
-
-The collected data is processed by an \*\*ESP32 microcontroller\*\* and transmitted to a Flutter-based Android application through BLE.
-
-
-
-The mobile application provides real-time data visualization, configurable thresholds, and audio/notification-based alerts.
-
-
-
-**System Architecture**
-
-
+## System Architecture
 
 <p align="center">
-
-&#x20; <img src="docs/blockdiagram.png" alt="BioTrack System Architecture" width="900">
-
+  <img src="docs/blockdiagram.png" alt="BioTrack system architecture block diagram" width="900">
 </p>
 
+At a high level, the system follows this data flow:
 
+**Sensors and emergency button → ESP32 processing → BLE → Android monitoring application**
 
-**Hardware**
+The wearable also provides local feedback through an OLED display and an RGB LED.
 
+## Hardware Components
 
+| Component | Function |
+| --- | --- |
+| ESP32 | Sensor acquisition, data processing, and BLE communication |
+| MAX30100 | Optical heart-rate sensing and IR signal acquisition |
+| MPU6050 | Three-axis accelerometer and gyroscope measurements |
+| RGB LED | Visual indication of system status |
+| OLED display | Heart-rate and sensor-contact information |
+| Emergency button | Manual emergency-event triggering |
+| Battery | Portable power supply |
+| TP4056 charging module | Battery charging |
+| 5 V boost converter | Voltage conversion for the system power supply |
+| Power switch | Main power control |
 
-The wearable unit is built around an ESP32 microcontroller and includes the following components:
+## Core Features
 
+### Heart-Rate Monitoring
 
+The **MAX30100** acquires an optical IR signal, which is processed using digital filtering and adaptive thresholding to estimate heart rate in beats per minute (BPM).
 
-| Component          | Function                                           |
+The firmware also evaluates sensor contact. When adequate contact is not detected, heart-rate measurement is suspended to avoid displaying misleading readings.
 
-| ------------------ | -------------------------------------------------- |
+### Motion Analysis
 
-| ESP32              | Data acquisition, processing and BLE communication |
+The **MPU6050** supplies acceleration and angular-velocity measurements along three axes. The corresponding vector magnitudes are calculated as:
 
-| MAX30100           | Heart-rate and infrared signal measurement         |
+$$
+|a| = \sqrt{A_x^2 + A_y^2 + A_z^2}
+$$
 
-| MPU6050            | Accelerometer and gyroscope measurements           |
+$$
+|\omega| = \sqrt{G_x^2 + G_y^2 + G_z^2}
+$$
 
-| RGB LED            | Visual system status indication                    |
+These values provide the input for the fall- and inactivity-detection algorithms.
 
-| OLED Display       | Heart-rate and contact-status display              |
+### Potential Fall Detection
 
-| Emergency Button   | Manual emergency triggering                        |
+The algorithm monitors sudden changes in acceleration magnitude between consecutive samples:
 
-| Battery            | Portable power source                              |
+$$
+\Delta |a| = \left|\,|a_t| - |a_{t-1}|\,\right|
+$$
 
-| TPA4056            | Battery charging                                   |
+If the change exceeds a configured threshold, the firmware flags a **potential fall event**. A threshold crossing is not, by itself, proof that a fall occurred.
 
-| 5V Boost Converter | Power regulation                                   |
+### Inactivity Detection
 
-| Power Switch       | System power control                               |
+An activity score combines acceleration and gyroscope information:
 
+$$
+\text{ActivityScore} = \left|\,|a| - 9.81\,\right| + K\,|\omega|
+$$
 
+Here, acceleration is expressed in m/s², angular velocity uses the units configured in the firmware, and **K** is a scaling factor. If the score remains below its configured threshold for a specified period, the system raises an inactivity alert.
 
-Features
+### Manual Emergency Button
 
+A physical button allows the wearer to manually trigger an emergency event. The event is sent over BLE to the mobile application, where an alert can be displayed.
 
+### Local Visual Feedback
 
-Real-Time Heart Rate Monitoring
+The RGB LED indicates the device's current state:
 
+| LED color | Indication |
+| --- | --- |
+| Green | Sensor contact detected; no active warning |
+| Red | Warning condition or threshold violation |
+| Blue | No sensor contact; heart-rate measurement inactive |
 
+The OLED display shows the current heart-rate reading and contact status.
 
-The MAX30100 sensor is used to acquire the user's optical IR signal.
+## Mobile Application
 
+The prototype includes a **Flutter-based Android monitoring interface** that receives sensor data through BLE and presents live measurements and alerts.
 
+> **Repository note:** The original Flutter application source code is not currently available in this repository. The screenshots below document the mobile interface developed for the prototype.
 
-The raw IR signal is processed using digital filtering and dynamic thresholding to calculate BPM (Beats Per Minute).
-
-
-
-The system also detects whether the sensor is in contact with the user. Heart-rate measurement is disabled when sufficient contact cannot be detected.
-
-
-
-Motion Analysis
-
-
-
-The MPU6050 provides three-axis acceleration and gyroscope data.
-
-
-
-The system calculates the magnitude of both acceleration and angular velocity:
-
-
-
-
-
-|a| = √(Ax² + Ay² + Az²)
-
-
-
-|gyro| = √(Gx² + Gy² + Gz²)
-
-
-
-
-
-These values are used as the basis for the safety algorithms.
-
-
-
-Fall Detection
-
-
-
-A sudden change in acceleration is used to identify potential fall events.
-
-
-
-The acceleration change is calculated as:
-
-
-
-Δ|a| = ||a| - |a\_prev||
-
-
-
-
-
-When the calculated change exceeds the configured threshold, a potential fall event is generated.
-
-
-
-Inactivity Detection
-
-
-
-An activity score is calculated by combining acceleration and gyroscope information:
-
-
-
-
-
-ActivityScore = ||a| - 9.81| + K × |gyro|
-
-
-
-
-
-If the activity score remains below the configured threshold for a predefined period, the system triggers an inactivity alarm.
-
-
-
-**Emergency Button**
-
-
-
-A dedicated physical button allows the user to manually trigger an emergency condition.
-
-
-
-When activated, the event is transmitted to the mobile application and a high-priority notification is generated.
-
-
-
-**Visual Feedback**
-
-
-
-The RGB LED provides an immediate indication of the system state:
-
-
-
-* &#x20;\*\*Green:\*\* User contact detected and no warning condition
-* &#x20;\*\*Red:\*\* Warning or threshold violation detected
-* &#x20;\*\*Blue:\*\* No user contact / measurement inactive
-
-
-
-The OLED display provides the current heart-rate value and sensor contact status.
-
-
-
-**Mobile Application**
-
-
-
-The Android application is developed using **Flutter** and communicates with the wearable device through BLE.
-
-
-
-The application consists of two main monitoring interfaces.
-
-
-
-**Graph View**
-
-
+### Graph View
 
 <p align="center">
-
-&#x20; <img src="docs/graphview.png">
-
+  <img src="docs/graphview.png" alt="BioTrack mobile application graph view" width="900">
 </p>
 
+The graph interface visualizes:
 
+- Acceleration and gyroscope measurements
+- Heart rate (BPM) and raw IR readings
+- Signal values and configured thresholds
+- Fall and inactivity status
 
-The graph interface provides real-time visualization of:
+Individual channels can be shown or hidden using checkbox controls. Selected thresholds can also be displayed alongside the corresponding data.
 
-
-
-* Acceleration
-* Gyroscope
-* BPM
-* Raw IR
-* Signal
-* Threshold
-* Fall status
-* Inactivity status
-
-
-
-Individual data channels can be enabled or disabled using the application's checkbox controls.
-
-
-
-Configured thresholds can also be displayed directly on the graphs.
-
-
-
-**Data View**
-
-
+### Data View
 
 <p align="center">
-
-&#x20; <img src="docs/dataview.png">
-
+  <img src="docs/dataview.png" alt="BioTrack mobile application data view" width="900">
 </p>
 
+The data view displays incoming sensor readings in a text-based format and allows users to configure monitoring thresholds, including BPM limits. When a threshold is exceeded, the application can issue an audio alert or notification.
 
+## Alert System
 
-The data interface provides real-time sensor values in a text-based format.
+BioTrack combines local hardware indicators with mobile alerts for the following conditions:
 
+- Manual emergency-button activation
+- Potential fall detection
+- Prolonged inactivity
+- Heart-rate values outside configured thresholds
 
+Detected events are reflected through the wearable's feedback components and, while a BLE connection is available, through the Android application.
 
-It also allows configurable threshold values for monitored parameters such as BPM.
+## Power & Mechanical Design
 
+The wearable is battery-powered and uses a charging circuit and a **5 V boost converter** as part of its power subsystem.
 
+The prototype uses a **two-layer perforated-board assembly**:
 
-When a configured threshold is exceeded, the application can generate an \*\*audio alarm and notification\*\*.
+- **Lower layer:** Body-facing components, including the MAX30100 sensor
+- **Upper layer:** ESP32 and other control electronics
 
+Removable pins, screws, and nuts connect the layers, making the assembly easier to inspect, maintain, and modify.
 
+## Communication
 
-Alert System
+The wearable and mobile application exchange data locally over BLE:
 
+```text
+ESP32 wearable  ── Bluetooth Low Energy (BLE) ──>  Flutter Android app
+```
 
+BLE allows wireless transfer of sensor readings and alert states without requiring a continuous internet connection. Mobile monitoring requires the device to remain within BLE communication range.
 
-BioTrack uses both hardware and software feedback mechanisms.
+## Development Environment
 
+- **ESP32 firmware:** Arduino framework / C++
+- **Mobile interface:** Flutter (Android; source code not included in the current repository)
+- **Wireless communication:** Bluetooth Low Energy (BLE)
 
+## Project Status
 
-Potential alert conditions include:
+The prototype implementation covers:
 
+- ESP32-based data acquisition and processing
+- Heart-rate and motion measurements
+- Potential fall and inactivity detection
+- Physical emergency button
+- BLE data transmission
+- OLED and RGB LED feedback
+- Flutter-based monitoring interface demonstrated in the project screenshots
+- Configurable thresholds and mobile alerts
 
+**Note:** This repository documents a functional engineering prototype, not a clinically validated or commercially certified wearable product.
 
-* Manual emergency button activation
-* Detected fall
-* Prolonged inactivity
-* Abnormal heart-rate values
+## Future Improvements
 
+Potential directions for continued development include:
 
+- GPS-based location reporting
+- GSM/cellular connectivity for wider-area emergency communication
+- Remote monitoring and cloud data storage
+- Historical health and activity visualization
+- More robust fall-detection algorithms and evaluation with representative datasets
+- Machine-learning-based anomaly detection
+- Reduced power consumption and improved battery management
+- A compact custom PCB and improved wearable enclosure
 
-When an alert condition occurs, the system provides feedback through the wearable device and the mobile application.
+GPS and cellular communication would extend the system beyond local BLE monitoring and could enable location-aware remote emergency notifications.
 
+## Potential Applications
 
+The architecture may be adapted for research and prototyping in areas such as:
 
-This combination allows the user to receive immediate local feedback while also making the detected event available through the mobile interface.
+- Wearable personal-safety monitoring
+- Elderly and assisted-care support concepts
+- Personal emergency-alert systems
+- General activity monitoring
+- Animal or pet activity monitoring (with appropriate sensor and algorithm changes)
 
+---
 
-
-**Power \& Mechanical Design**
-
-
-
-The system is designed as a portable, wearable device powered by a battery.
-
-
-
-A charging circuit and a 5V boost converter are used to provide a stable power supply for the system.
-
-
-
-The hardware is assembled using a two-layer perforated board structure. Components requiring physical contact with the body, such as the MAX30100, are positioned on the lower layer, while the ESP32 and other control components are placed on the upper layer.
-
-
-
-The two layers are connected using removable pins, screws, and nuts, allowing easier maintenance and future modifications.
-
-
-
-**Communication**
-
-
-
-Communication between the wearable device and the mobile application is performed using:
-
-
-
-ESP32 → Bluetooth Low Energy (BLE) → Flutter Application
-
-
-
-BLE was selected to provide wireless communication between the wearable hardware and the Android application while maintaining a suitable architecture for a portable monitoring device.
-
-
-
-> The repository structure may vary depending on the current development state of the project.
-
-
-
-\## Current Status
-
-
-
-The core monitoring system has been implemented, including:
-
-
-
-* ESP32-based sensor acquisition
-* Heart-rate measurement
-* Motion data acquisition
-* Fall detection
-* Inactivity detection
-* Emergency button
-* BLE communication
-* OLED status display
-* RGB LED feedback
-* Flutter-based mobile monitoring
-* Configurable monitoring thresholds
-* Mobile audio and notification alerts
-
-
-
-**Future Improvements**
-
-
-
-Possible future improvements include:
-
-
-
-* GPS integration for location tracking
-* GSM/mobile network connectivity
-* Remote monitoring over the Internet
-* Cloud-based data storage
-* Historical health and activity analysis
-* Improved fall-detection algorithms
-* Machine-learning-based anomaly detection
-* Lower-power operation and battery optimization
-* A more compact custom PCB design
-
-
-
-GPS and GSM integration are particularly intended to extend the system beyond local BLE monitoring by enabling location-aware emergency communication over wider distances.
-
-
-
-**Applications**
-
-
-
-The BioTrack architecture can be adapted to different monitoring scenarios, including:
-
-
-
-* Wearable safety systems
-* Elderly monitoring
-* Assisted-care applications
-* Personal emergency detection
-* Activity monitoring
-* Pet monitoring
-
-
-
-
-
+*BioTrack is intended for engineering experimentation and educational demonstration.*
